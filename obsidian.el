@@ -444,14 +444,14 @@ TOGGLE-PATH is a boolean that will toggle the behavior of
 ;;;###autoload
 (defun obsidian-view-file ()
   "View the currently-open markdown file in the obsidian app."
-  (start-process "" nil "xdg-open" concat("obsidian://open?vault=" obsidian-directory "&file=" (obsidian--file-relative-name (buffer-file-name (window-buffer (minibuffer-selected-window))))))
-  ;; (let ((obsidian-fname-parts
-  ;;        (string-split (nth 1 (string-split (buffer-file-name (window-buffer (minibuffer-selected-window))) "obsidian/")) "/")))
-  ;; (let ((vault-path (pop obsidian-fname-parts))
-  ;;       (note-path (string-join obsidian-fname-parts "/")))
-  ;;   (let ((shitty-command-string (concat "obsidian://open?vault=" vault-path "&file=" note-path)))
-  ;;     (start-process "obsidian-view" "obsidian-view-buffer" "xdg-open" shitty-command-string))))
-  )
+  (interactive)
+  ;; (start-process "" nil "xdg-open" concat("obsidian://open?vault=" obsidian-directory "&file=" (obsidian--file-relative-name (buffer-file-name (window-buffer (minibuffer-selected-window))))))
+  (let ((obsidian-fname-parts
+         (string-split (nth 1 (string-split (buffer-file-name) "obsidian/")) "/")))
+    (let ((vault-path (pop obsidian-fname-parts))
+          (note-path (string-join obsidian-fname-parts "/")))
+      (let ((obsidian-view-command (concat "obsidian://open?vault=" vault-path "&file=" note-path)))
+      (start-process "obsidian-view" "obsidian-view-buffer" "xdg-open" obsidian-view-command)))))
 
 ;;;###autoload
 (defun obsidian-insert-wikilink (&optional arg)
