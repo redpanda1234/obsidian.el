@@ -82,7 +82,7 @@
     If it is true, create in inbox, otherwise next to the current buffer."
   :type 'boolean)
 
-(defcustom obsidian-daily-notes-directory obsidian-inbox-directory 
+(defcustom obsidian-daily-notes-directory obsidian-inbox-directory
   "Subdir to create daily notes with `obsidian-daily-note'. Default: the inbox directory"
   :type 'directory)
 
@@ -440,6 +440,18 @@ TOGGLE-PATH is a boolean that will toggle the behavior of
          (description (read-from-minibuffer "Description (optional): " (or region default-description)))
          (file-link (obsidian--format-link verified-file toggle-path)))
     (list :file file-link :description description)))
+
+;;;###autoload
+(defun obsidian-view-file ()
+  "View the currently-open markdown file in the obsidian app."
+  (start-process "" nil "xdg-open" concat("obsidian://open?vault=" obsidian-directory "&file=" (obsidian--file-relative-name (buffer-file-name (window-buffer (minibuffer-selected-window))))))
+  ;; (let ((obsidian-fname-parts
+  ;;        (string-split (nth 1 (string-split (buffer-file-name (window-buffer (minibuffer-selected-window))) "obsidian/")) "/")))
+  ;; (let ((vault-path (pop obsidian-fname-parts))
+  ;;       (note-path (string-join obsidian-fname-parts "/")))
+  ;;   (let ((shitty-command-string (concat "obsidian://open?vault=" vault-path "&file=" note-path)))
+  ;;     (start-process "obsidian-view" "obsidian-view-buffer" "xdg-open" shitty-command-string))))
+  )
 
 ;;;###autoload
 (defun obsidian-insert-wikilink (&optional arg)
