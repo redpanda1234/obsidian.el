@@ -94,7 +94,7 @@
   "Daily notes' template filename in templates directory"
   :type 'file)
 
-(defcustom obsidian-mirror-open-note t
+(defcustom obsidian-mirror-open-note nil
   "Controls whether to automatically open vault files simultaneously in the Obsidian via `obsidian-view-file'. Default: nil"
   :type 'boolean)
 
@@ -634,8 +634,8 @@ TOGGLE-PATH is a boolean that will toggle the behavior of
   (interactive)
   (let ((obsidian-fname-parts
          (string-split (nth 1 (string-split (buffer-file-name) "obsidian/")) "/")))
-    (let ((vault-path (pop obsidian-fname-parts))
-          (note-path (string-join obsidian-fname-parts "/")))
+    (let* ((vault-path (pop obsidian-fname-parts))
+           (note-path (string-join obsidian-fname-parts "/")))
       (let ((obsidian-view-command (concat "obsidian://open?vault=" vault-path "&file=" note-path)))
         (start-process "obsidian-view" "obsidian-view-buffer" "xdg-open" obsidian-view-command)))))
 
@@ -681,7 +681,7 @@ In the `obsidian-inbox-directory' if set otherwise in `obsidian-directory' root.
   (let* ((title (read-from-minibuffer "Title: "))
          (filename (s-concat obsidian-directory "/" obsidian-inbox-directory "/" title ".md"))
          (clean-filename (s-replace "//" "/" filename)))
-    (find-file (expand-file-name clean-filename) t)
+    (obsidian-mirror-find-file (expand-file-name clean-filename) t)
     (save-buffer)
     (add-to-list 'obsidian-files-cache clean-filename)))
 
@@ -696,7 +696,7 @@ in `obsidian-directory' root.
   (let* ((title (format-time-string "%Y-%m-%d"))
          (filename (s-concat obsidian-directory "/" obsidian-daily-notes-directory "/" title ".md"))
          (clean-filename (s-replace "//" "/" filename)))
-    (find-file (expand-file-name clean-filename) t)
+    (obsidian-mirror-find-file (expand-file-name clean-filename) t)
     (save-buffer)
     (if (and obsidian-templates-directory obsidian-daily-note-template (eq (buffer-size) 0))
         (progn
@@ -716,11 +716,9 @@ in `obsidian-directory' root.
          (choice (completing-read "Jump to: " choices))
          (target (obsidian--get-alias choice (gethash choice dict))))
     (if target
-        ((find-file target)
-         (if obsidian-mirror-open-note
-             (obsidian-view-file)
-           (message "foo")))
+        (obsidian-mirror-find-file target)
       (user-error "Note not found: %s" choice))))
+
 
 ;;;###autoload
 (defun obsidian-move-file ()
@@ -780,7 +778,16 @@ If ARG is set, the file will be opened in other window."
                   (let* ((choice (completing-read "Jump to: " matches)))
                     choice))))
          (find-fn (if arg #'find-file-other-window #'find-file)))
-    (funcall find-fn (obsidian--expand-file-name file))))
+    (progn
+      (funcall find-fn (obsidian--expand-file-name file))
+      (if obsidian-mirror-open-note
+          (obsidian-view-file)))))
+
+(defun obsidian-mirror-find-file (f &optional arg)
+  (progn
+    (find-file f arg)
+    (if obsidian-mirror-open-note
+        (obsidian-view-file))))
 
 (defun obsidian--maybe-in-same-dir (f)
   "If `f` contains '/', returns f, otherwise with buffer, relative to the buffer"
@@ -928,7 +935,7 @@ See `markdown-follow-link-at-point' and
     (if choices
         (let* ((choice (completing-read "Jump to: " choices))
                (target (obsidian--get-alias choice (gethash choice dict))))
-          (find-file target))
+          (obsidian-mirror-find-file target))
       (message "No backlinks found."))))
 
 ;;;###autoload
