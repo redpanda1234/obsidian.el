@@ -94,6 +94,10 @@
   "Daily notes' template filename in templates directory"
   :type 'file)
 
+(defcustom obsidian-mirror-open-note t
+  "Controls whether to automatically open vault files simultaneously in the Obsidian via `obsidian-view-file'. Default: nil"
+  :type 'boolean)
+
 (eval-when-compile (defvar local-minor-modes))
 
 (defun obsidian--directory-files-pre28 (orig-func dir &optional full match nosort ignored)
@@ -441,17 +445,199 @@ TOGGLE-PATH is a boolean that will toggle the behavior of
          (file-link (obsidian--format-link verified-file toggle-path)))
     (list :file file-link :description description)))
 
+;; ;;;###autoload
+;; (defun markdown-indent-find-next-position (cur-pos positions)
+;;   "Return the position after the index of CUR-POS in POSITIONS.
+;; Positions are calculated by `markdown-calc-indents'."
+;;   (while (and positions
+;;               (not (equal cur-pos (car positions))))
+;;     (setq positions (cdr positions)))
+;;   (or (cadr positions) 0))
+
+;; (defun markdown-outdent-find-next-position (cur-pos positions)
+;;   "Return the maximal element that precedes CUR-POS from POSITIONS.
+;; Positions are calculated by `markdown-calc-indents'."
+;;   (let ((result 0))
+;;     (dolist (i positions)
+;;       (when (< i cur-pos)
+;;         (setq result (max result i))))
+;;     result))
+
+;; (defun markdown-indent-line ()
+;;   "Indent the current line using some heuristics.
+;; If the _previous_ command was either `markdown-enter-key' or
+;; `markdown-cycle', then we should cycle to the next
+;; reasonable indentation position.  Otherwise, we could have been
+;; called directly by `markdown-enter-key', by an initial call of
+;; `markdown-cycle', or indirectly by `auto-fill-mode'.  In
+;; these cases, indent to the default position.
+;; Positions are calculated by `markdown-calc-indents'."
+;;   (interactive)
+;;   (let ((positions (markdown-calc-indents))
+;;         (point-pos (current-column))
+;;         (_ (back-to-indentation))
+;;         (cur-pos (current-column)))
+;;     (if (not (equal this-command 'markdown-cycle))
+;;         (indent-line-to (car positions))
+;;       (setq positions (sort (delete-dups positions) '<))
+;;       (let* ((next-pos (markdown-indent-find-next-position cur-pos positions))
+;;              (new-point-pos (max (+ point-pos (- next-pos cur-pos)) 0)))
+;;         (indent-line-to next-pos)
+;;         (move-to-column new-point-pos)))))
+
+;; (defun markdown-calc-indents ()
+;;   "Return a list of indentation columns to cycle through.
+;; The first element in the returned list should be considered the
+;; default indentation level.  This function does not worry about
+;; duplicate positions, which are handled up by calling functions."
+;;   (let (pos prev-line-pos positions)
+
+;;     ;; Indentation of previous line
+;;     (setq prev-line-pos (markdown-prev-line-indent))
+;;     (setq positions (cons prev-line-pos positions))
+
+;;     ;; Indentation of previous non-list-marker text
+;;     (when (setq pos (save-excursion
+;;                       (forward-line -1)
+;;                       (when (looking-at markdown-regex-list)
+;;                         (- (match-end 3) (match-beginning 0)))))
+;;       (setq positions (cons pos positions)))
+
+;;     ;; Indentation required for a pre block in current context
+;;     (setq pos (length (markdown-pre-indentation (point))))
+;;     (setq positions (cons pos positions))
+
+;;     ;; Indentation of the previous line + tab-width
+;;     (if prev-line-pos
+;;         (setq positions (cons (+ prev-line-pos tab-width) positions))
+;;       (setq positions (cons tab-width positions)))
+
+;;     ;; Indentation of the previous line - tab-width
+;;     (if (and prev-line-pos (> prev-line-pos tab-width))
+;;         (setq positions (cons (- prev-line-pos tab-width) positions)))
+
+;;     ;; Indentation of all preceding list markers (when in a list)
+;;     (when (setq pos (markdown-calculate-list-levels))
+;;       (setq positions (append pos positions)))
+
+;;     ;; First column
+;;     (setq positions (cons 0 positions))
+
+;;     ;; Return reversed list
+;;     (reverse positions)))
+
+;; (defun markdown-enter-key ()        ;FIXME: Partly obsoleted by electric-indent
+;;   "Handle RET depending on the context.
+;; If the point is at a table, move to the next row.  Otherwise,
+;; indent according to value of `markdown-indent-on-enter'.
+;; When it is nil, simply call `newline'.  Otherwise, indent the next line
+;; following RET using `markdown-indent-line'.  Furthermore, when it
+;; is set to \\='indent-and-new-item and the point is in a list item,
+;; start a new item with the same indentation. If the point is in an
+;; empty list item, remove it (so that pressing RET twice when in a
+;; list simply adds a blank line)."
+;;   (interactive)
+;;   (cond
+;;    ;; Table
+;;    ((markdown-table-at-point-p)
+;;     (call-interactively #'markdown-table-next-row))
+;;    ;; Indent non-table text
+;;    (markdown-indent-on-enter
+;;     (let (bounds)
+;;       (if (and (memq markdown-indent-on-enter '(indent-and-new-item))
+;;                (setq bounds (markdown-cur-list-item-bounds)))
+;;           (let ((beg (cl-first bounds))
+;;                 (end (cl-second bounds))
+;;                 (nonlist-indent (cl-fourth bounds))
+;;                 (checkbox (cl-sixth bounds)))
+;;             ;; Point is in a list item
+;;             (if (= (- end beg) (+ nonlist-indent (length checkbox)))
+;;                 ;; Delete blank list
+;;                 (progn
+;;                   (delete-region beg end)
+;;                   (newline)
+;;                   (markdown-indent-line))
+;;               (call-interactively #'markdown-insert-list-item)))
+;;         ;; Point is not in a list
+;;         (newline)
+;;         (markdown-indent-line))))
+;;    ;; Insert a raw newline
+;;    (t (newline))))
+
+;; (defun markdown-outdent-or-delete (arg)
+;;   "Handle BACKSPACE by cycling through indentation points.
+;; When BACKSPACE is pressed, if there is only whitespace
+;; before the current point, then outdent the line one level.
+;; Otherwise, do normal delete by repeating
+;; `backward-delete-char-untabify' ARG times."
+;;   (interactive "*p")
+;;   (if (use-region-p)
+;;       (backward-delete-char-untabify arg)
+;;     (let ((cur-pos (current-column))
+;;           (start-of-indention (save-excursion
+;;                                 (back-to-indentation)
+;;                                 (current-column)))
+;;           (positions (markdown-calc-indents)))
+;;       (if (and (> cur-pos 0) (= cur-pos start-of-indention))
+;;           (indent-line-to (markdown-outdent-find-next-position cur-pos positions))
+;;         (backward-delete-char-untabify arg)))))
+
+;; (defun markdown-find-leftmost-column (beg end)
+;;   "Find the leftmost column in the region from BEG to END."
+;;   (let ((mincol 1000))
+;;     (save-excursion
+;;       (goto-char beg)
+;;       (while (< (point) end)
+;;         (back-to-indentation)
+;;         (unless (looking-at-p "[ \t]*$")
+;;           (setq mincol (min mincol (current-column))))
+;;         (forward-line 1)
+;;         ))
+;;     mincol))
+
+;; (defun markdown-indent-region (beg end arg)
+;;   "Indent the region from BEG to END using some heuristics.
+;; When ARG is non-nil, outdent the region instead.
+;; See `markdown-indent-line' and `markdown-indent-line'."
+;;   (interactive "*r\nP")
+;;   (let* ((positions (sort (delete-dups (markdown-calc-indents)) '<))
+;;          (leftmostcol (markdown-find-leftmost-column beg end))
+;;          (next-pos (if arg
+;;                        (markdown-outdent-find-next-position leftmostcol positions)
+;;                      (markdown-indent-find-next-position leftmostcol positions))))
+;;     (indent-rigidly beg end (- next-pos leftmostcol))
+;;     (setq deactivate-mark nil)))
+
+;; (defun markdown-outdent-region (beg end)
+;;   "Call `markdown-indent-region' on region from BEG to END with prefix."
+;;   (interactive "*r")
+;;   (markdown-indent-region beg end t))
+
+;; (defun markdown--indent-region (start end)
+;;   (let ((deactivate-mark nil))
+;;     (save-excursion
+;;       (goto-char end)
+;;       (setq end (point-marker))
+;;       (goto-char start)
+;;       (when (bolp)
+;;         (forward-line 1))
+;;       (while (< (point) end)
+;;         (unless (or (markdown-code-block-at-point-p) (and (bolp) (eolp)))
+;;           (indent-according-to-mode))
+;;         (forward-line 1))
+;;       (move-marker end nil))))
+
+
 ;;;###autoload
 (defun obsidian-view-file ()
   "View the currently-open markdown file in the obsidian app."
   (interactive)
-  ;; (start-process "" nil "xdg-open" concat("obsidian://open?vault=" obsidian-directory "&file=" (obsidian--file-relative-name (buffer-file-name (window-buffer (minibuffer-selected-window))))))
   (let ((obsidian-fname-parts
          (string-split (nth 1 (string-split (buffer-file-name) "obsidian/")) "/")))
     (let ((vault-path (pop obsidian-fname-parts))
           (note-path (string-join obsidian-fname-parts "/")))
       (let ((obsidian-view-command (concat "obsidian://open?vault=" vault-path "&file=" note-path)))
-      (start-process "obsidian-view" "obsidian-view-buffer" "xdg-open" obsidian-view-command)))))
+        (start-process "obsidian-view" "obsidian-view-buffer" "xdg-open" obsidian-view-command)))))
 
 ;;;###autoload
 (defun obsidian-insert-wikilink (&optional arg)
@@ -530,7 +716,10 @@ in `obsidian-directory' root.
          (choice (completing-read "Jump to: " choices))
          (target (obsidian--get-alias choice (gethash choice dict))))
     (if target
-        (find-file target)
+        ((find-file target)
+         (if obsidian-mirror-open-note
+             (obsidian-view-file)
+           (message "foo")))
       (user-error "Note not found: %s" choice))))
 
 ;;;###autoload
